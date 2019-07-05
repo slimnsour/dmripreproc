@@ -7,7 +7,10 @@ def init_fmap_wf():
 
     wf = pe.Workflow(name="fmap_prep_wf")
 
-    inputnode = pe.Node(niu.IdentityInterface(fields=["fieldmap", "magnitude", "b0_stripped"]), name="inputnode")
+    inputnode = pe.Node(
+        niu.IdentityInterface(fields=["fieldmap", "magnitude", "b0_stripped"]),
+        name="inputnode",
+    )
 
     outputnode = pe.Node(niu.IdentityInterface(fields=["out_fmap"]), name="outputnode")
 
