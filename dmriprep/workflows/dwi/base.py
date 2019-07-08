@@ -89,7 +89,11 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, layout, bet_dwi_frac, be
             "k-": "0 0 -1 %.7f",
         }
 
+        # Check for either PhaseEncodingDirection or PhaseEncodingAxis
         pe_dir = metadata.get("PhaseEncodingDirection")
+        if not(pe_dir):
+            pe_dir = metadata.get("PhaseEncodingAxis")
+
         total_readout = metadata.get("TotalReadoutTime")
 
         acq_param_lines = acq_param_dict[pe_dir] % total_readout
