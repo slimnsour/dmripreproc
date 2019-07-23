@@ -259,11 +259,11 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
                         ("outputnode.out_topup", "in_topup_fieldcoef"),
                         ("outputnode.out_movpar", "in_topup_movpar"),
                     ],
-                ),
-                (sdc_wf, eddy_quad, [("outputnode.out_enc_file", "param_file")])
+                )
             ]
         )
         ecc.inputs.in_acqp = parameters.acqp_file
+        eddy_quad.inputs.param_file = parameters.acqp_file
     else:
         # Decide what ecc will take: topup or fmap
         fmaps.sort(key=lambda fmap: FMAP_PRIORITY[fmap["suffix"]])
