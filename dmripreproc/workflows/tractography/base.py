@@ -73,7 +73,7 @@ def init_tract_wf():
     estimateFOD = pe.Node(mrtrix3.EstimateFOD(algorithm='csd', wm_odf='FOD.mif'), name="estimateFOD")
     # perform probabilistic tractography
     #tckgen FOD.mif prob.tck -act 5TT.mif -seed_gmwmi gmwmi.mif -select 5000000 ## seeding from a binarised gmwmi
-    tckgen = pe.Node(mrtrix3.Tractography(select=5000), name="tckgen")
+    tckgen = pe.Node(mrtrix3.Tractography(select=5000000), name="tckgen")
     #mrview data.nii.gz -tractography.load prob.tck
 
     def gen_tuple(item1, item2):
@@ -108,11 +108,16 @@ def init_tract_wf():
     #tck2connectome prob.tck shen_diff_space.nii.gz conmat_length_shen.csv -zero_diagonal -symmetric -scale_length -stat_edge mean -assignment_radial_search 2
     conmatgen2 = pe.Node(mrtrix3.BuildConnectome(out_file="conmat_length_shen.csv", scale_length=True, symmetric=True, zero_diagonal=True, search_radius=2, stat_edge='mean'), name="conmatgen2")
 
+    # Convert mifs to niftis
+    fod_convert = pe.Node(mrtrix3.MRConvert(out_filename="FOD.nii.gz"), name="fod_convert")
+    gmwmi_convert = pe.Node(mrtrix3.MRConvert(out_filename="gmwmi.nii.gz"), name="gmwmi_convert")
+
     # Initialize output wf
     datasink = init_tract_output_wf()
 
     tract_wf.connect(
         [
+            # t1 flirt
             (
                 inputnode,
                 flirt,
@@ -121,6 +126,7 @@ def init_tract_wf():
                     ("dwi_mask", "reference")
                 ]
             ),
+            # response function + mask
             (flirt, gen5tt, [("out_file", "in_file")]),
             (gen5tt, gen5ttMask, [("out_file", "in_file")]),
             (
@@ -139,6 +145,7 @@ def init_tract_wf():
                     ("eddy_file", "in_file"),
                 ]
             ),
+            # FOD gen
             (gen_tuple, estimateFOD, [("out_tuple", "grad_fsl")]),
             (
                 inputnode,
@@ -177,8 +184,12 @@ def init_tract_wf():
             (tcksift, conmatgen, [("out_weights", "in_weights")]),
             (tckgen, conmatgen2, [("out_file", "in_file")]),
             (atlas_flirt, conmatgen2, [("out_file", "in_parc")]),
+            # convert mifs to niftis
+            (gen5tt, fod_convert, [("out_file", "in_file")]),
+            (gen5ttMask, gmwmi_convert, [("out_file", "in_file")]),
             # outputnode
-            (tckgen, outputnode, [("out_file", "tck_file")]),
+            (fod_convert, outputnode, [("converted", "fod_file")]),
+            (gmwmi_convert, outputnode, [("converted", "gmwmi_file")]),
             (tcksift, outputnode, [("out_weights", "prob_weights")]),
             (atlas_flirt, outputnode, [("out_file", "shen_diff_space")]),
             (conmatgen, outputnode, [("out_file", "inv_len_conmat")]),
@@ -197,7 +208,8 @@ def init_tract_wf():
                 outputnode,
                 datasink,
                 [
-                    ("tck_file", "inputnode.tck_file"),
+                    ("fod_file", "inputnode.fod_file"),
+                    ("gmwmi_file", "inputnode.gmwmi_file"),
                     ("prob_weights", "inputnode.prob_weights"),
                     ("shen_diff_space", "inputnode.shen_diff_space"),
                     ("inv_len_conmat", "inputnode.inv_len_conmat"),
@@ -206,4 +218,5 @@ def init_tract_wf():
             ),
         ]
     )
+
     return tract_wf

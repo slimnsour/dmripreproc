@@ -16,8 +16,10 @@ def init_tract_output_wf():
             fields=[
                 "subject_id",
                 "session_id",
-                "tck_file",
+                "output_folder",
                 "prob_weights",
+                "fod_file",
+                "gmwmi_file",
                 "shen_diff_space",
                 "inv_len_conmat",
                 "len_conmat"
@@ -64,10 +66,11 @@ def init_tract_output_wf():
                 inputnode,
                 datasink,
                 [
-                    ("tck_file", "@result.@tck_file"),
                     ("prob_weights", "@result.@prob_weights"),
                     ("shen_diff_space", "@result.@shen_diff_space"),
                     ("inv_len_conmat", "@result.@inv_len_conmat"),
+                    ("fod_file", "@result.@fod_file"),
+                    ("gmwmi_file", "@result.@gmwmi_file"),
                     ("len_conmat", "@result.@len_conmat")
                 ],
             ),

@@ -9,7 +9,7 @@ from __future__ import (
 
 import os.path as op
 
-from nipype.interfaces.base import traits, TraitedSpec, File, InputMultiObject, Undefined, CommandLineInputSpec
+from nipype.interfaces.base import traits, TraitedSpec, File, InputMultiObject, Undefined, CommandLineInputSpec, CommandLine, isdefined
 from nipype.interfaces.mrtrix3.base import MRTrix3BaseInputSpec, MRTrix3Base
 
 
@@ -930,3 +930,146 @@ class BuildConnectome(MRTrix3Base):
         outputs = self.output_spec().get()
         outputs['out_file'] = op.abspath(self.inputs.out_file)
         return outputs
+
+class MRConvertInputSpec(CommandLineInputSpec):
+    in_file = File(
+        exists=True,
+        argstr='%s',
+        mandatory=True,
+        position=-2,
+        desc='voxel-order data filename')
+    out_filename = File(
+        genfile=True, argstr='%s', position=-1, desc='Output filename')
+    extract_at_axis = traits.Enum(
+        1,
+        2,
+        3,
+        argstr='-coord %s',
+        position=1,
+        desc=
+        '"Extract data only at the coordinates specified. This option specifies the Axis. Must be used in conjunction with extract_at_coordinate.'
+    )
+    extract_at_coordinate = traits.List(
+        traits.Float,
+        argstr='%s',
+        sep=',',
+        position=2,
+        minlen=1,
+        maxlen=3,
+        desc=
+        '"Extract data only at the coordinates specified. This option specifies the coordinates. Must be used in conjunction with extract_at_axis. Three comma-separated numbers giving the size of each voxel in mm.'
+    )
+    voxel_dims = traits.List(
+        traits.Float,
+        argstr='-vox %s',
+        sep=',',
+        position=3,
+        minlen=3,
+        maxlen=3,
+        desc=
+        'Three comma-separated numbers giving the size of each voxel in mm.')
+    output_datatype = traits.Enum(
+        "nii",
+        "float",
+        "char",
+        "short",
+        "int",
+        "long",
+        "double",
+        argstr='-output %s',
+        position=2,
+        desc=
+        '"i.e. Bfloat". Can be "char", "short", "int", "long", "float" or "double"'
+    )  # , usedefault=True)
+    extension = traits.Enum(
+        "mif",
+        "nii",
+        "float",
+        "char",
+        "short",
+        "int",
+        "long",
+        "double",
+        position=2,
+        desc=
+        '"i.e. Bfloat". Can be "char", "short", "int", "long", "float" or "double"',
+        usedefault=True)
+    layout = traits.Enum(
+        "nii",
+        "float",
+        "char",
+        "short",
+        "int",
+        "long",
+        "double",
+        argstr='-output %s',
+        position=2,
+        desc=
+        'specify the layout of the data in memory. The actual layout produced will depend on whether the output image format can support it.'
+    )
+    resample = traits.Float(
+        argstr='-scale %d',
+        position=3,
+        units='mm',
+        desc='Apply scaling to the intensity values.')
+    offset_bias = traits.Float(
+        argstr='-scale %d',
+        position=3,
+        units='mm',
+        desc='Apply offset to the intensity values.')
+    replace_NaN_with_zero = traits.Bool(
+        argstr='-zero', position=3, desc="Replace all NaN values with zero.")
+    prs = traits.Bool(
+        argstr='-prs',
+        position=3,
+        desc=
+        "Assume that the DW gradients are specified in the PRS frame (Siemens DICOM only)."
+    )
+
+
+class MRConvertOutputSpec(TraitedSpec):
+    converted = File(exists=True, desc='path/name of 4D volume in voxel order')
+
+
+class MRConvert(CommandLine):
+    """
+    Perform conversion between different file types and optionally extract a subset of the input image.
+    If used correctly, this program can be a very useful workhorse.
+    In addition to converting images between different formats, it can
+    be used to extract specific studies from a data set, extract a specific
+    region of interest, flip the images, or to scale the intensity of the images.
+    Example
+    -------
+    >>> import nipype.interfaces.mrtrix as mrt
+    >>> mrconvert = mrt.MRConvert()
+    >>> mrconvert.inputs.in_file = 'dwi_FA.mif'
+    >>> mrconvert.inputs.out_filename = 'dwi_FA.nii'
+    >>> mrconvert.run()                                 # doctest: +SKIP
+    """
+
+    _cmd = 'mrconvert'
+    input_spec = MRConvertInputSpec
+    output_spec = MRConvertOutputSpec
+
+    def _list_outputs(self):
+        outputs = self.output_spec().get()
+        outputs['converted'] = self.inputs.out_filename
+        if not isdefined(outputs['converted']):
+            outputs['converted'] = op.abspath(self._gen_outfilename())
+        else:
+            outputs['converted'] = op.abspath(outputs['converted'])
+        return outputs
+
+    def _gen_filename(self, name):
+        if name == 'out_filename':
+            return self._gen_outfilename()
+        else:
+            return None
+
+    def _gen_outfilename(self):
+        _, name, _ = split_filename(self.inputs.in_file)
+        if isdefined(self.inputs.out_filename):
+            outname = self.inputs.out_filename
+        else:
+            outname = name + '_mrconvert.' + self.inputs.extension
+        return outname
