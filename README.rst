@@ -2,6 +2,9 @@
   :target: https://codecov.io/gh/TIGRLab/dmripreproc  
 .. image:: https://img.shields.io/badge/code%20style-black-000000.svg
     :target: https://github.com/python/black
+.. image:: https://api.codacy.com/project/badge/Grade/f45ec5c64894427a8860cc87cda1910a
+   :alt: Codacy Badge
+   :target: https://app.codacy.com/app/josephmje/dmripreproc?utm_source=github.com&utm_medium=referral&utm_content=TIGRLab/dmripreproc&utm_campaign=Badge_Grade_Dashboard
 
 # <img alt="dmriprep" src="docs/img/dmriprep_icon.svg" height="128"> dmriprep
 
@@ -100,9 +103,3 @@ The imposter syndrome disclaimer was originally written by
 talk](https://www.youtube.com/watch?v=6Uj746j9Heo), and was
 adapted based on its use in the README file for the [MetPy
 project](https://github.com/Unidata/MetPy).
-
-
-
-.. image:: https://api.codacy.com/project/badge/Grade/f45ec5c64894427a8860cc87cda1910a
-   :alt: Codacy Badge
-   :target: https://app.codacy.com/app/josephmje/dmripreproc?utm_source=github.com&utm_medium=referral&utm_content=TIGRLab/dmripreproc&utm_campaign=Badge_Grade_Dashboard
