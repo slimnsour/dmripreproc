@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-"""Console script for dmriprep."""
+"""Console script for dmripreproc."""
 import os
 import sys
 import warnings
@@ -9,7 +9,7 @@ from bids import BIDSLayout
 import click
 
 from . import utils
-from .workflows.base import init_dmriprep_wf
+from .workflows.base import init_dmripreproc_wf
 
 # Filter warnings that are visible whenever you import another package that
 # was compiled against an older numpy than is installed.
@@ -27,6 +27,14 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
     "all subjects will be analyzed. Multiple participants "
     "can be specified with a space separated list.",
     default=None,
+)
+#@click.option(
+#    "--ignore",
+#    help="Ignore selected parts of the workflow.",
+#    type=click.Choice(["denoise", "unring"]),
+#)
+@click.option(
+    "--resize-scale", help="Scale factor to resize DWI image", type=(float)
 )
 @click.option(
     "--eddy-niter",
@@ -73,6 +81,21 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
     default=None,
     type=(str),
 )
+@click.option(
+    "--synb0_dir",
+    help="If you want to use Synb0-DISCO for preprocessing.",
+    #is_flag=True
+    default=None,
+    type=(str),
+)
+@click.option(
+    "--acqp_file",
+    help="If you want to pass in an acqp file for topup/eddy instead of"
+    "generating it from the json by default.",
+    #is_flag=True
+    default=None,
+    type=(str),
+)
 @click.argument("bids_dir")
 @click.argument("output_dir")
 @click.argument(
@@ -84,12 +107,15 @@ def main(
     participant_label,
     bids_dir,
     output_dir,
+    resize_scale,
     eddy_niter=5,
     bet_dwi=0.3,
     bet_mag=0.3,
     total_readout=None,
-    ignore_nodes='',
+    ignore_nodes="",
     analysis_level="participant",
+    synb0_dir=None,
+    acqp_file=None,
 ):
     """
     BIDS_DIR: The directory with the input dataset formatted according to
@@ -104,13 +130,15 @@ def main(
     participant level analyses can be run independently
     (in parallel).
     """
+
     if analysis_level is not "participant":
         raise NotImplementedError(
-            "The only valid analysis level for dmriprep "
+            "The only valid analysis level for dmripreproc "
             "is participant at the moment."
         )
 
     layout = BIDSLayout(bids_dir, validate=False)
+    print(layout)
     subject_list = utils.collect_participants(
         layout, participant_label=participant_label
     )
@@ -131,10 +159,10 @@ def main(
     parameters.total_readout = total_readout
     parameters.ignore_nodes = ignore_nodes
     parameters.analysis_level = analysis_level
+    parameters.synb0_dir = synb0_dir
+    parameters.acqp_file = acqp_file
 
-    wf = init_dmriprep_wf(
-        parameters
-    )
+    wf = init_dmripreproc_wf(parameters)
     wf.write_graph(graph2use="colored")
     wf.config["execution"]["remove_unnecessary_outputs"] = False
     wf.config["execution"]["keep_inputs"] = True
