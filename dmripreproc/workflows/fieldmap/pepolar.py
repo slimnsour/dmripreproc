@@ -73,9 +73,7 @@ def init_pepolar_wf(subject_id, dwi_meta, epi_fmaps):
 
     return wf
 
-def init_synb0_wf(subject_id, dwi_meta, synb0):
-    dwi_file_pe = dwi_meta["PhaseEncodingDirection"]
-
+def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file):
     file2dir = dict()
 
     usable_fieldmaps_matching_pe = []
@@ -95,7 +93,7 @@ def init_synb0_wf(subject_id, dwi_meta, synb0):
             (inputnode, topup_wf, [("b0_stripped", "inputnode.epi_file")])
         ]
     )
-    topup_wf.inputs.inputnode.acqp = '/scratch/smansour/synb0_acqp.txt'
+    topup_wf.inputs.inputnode.acqp = acqp_file
 
     wf.connect(
         [

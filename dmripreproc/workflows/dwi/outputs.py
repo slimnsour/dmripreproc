@@ -27,6 +27,9 @@ def init_output_wf(subject_id, session_id, output_folder):
                 "out_V1",
                 "out_sh_residual",
                 "output_folder",
+                "out_sse",
+                "out_eddy_b0",
+                "out_eddy_qc_folder",
             ]
         ),
         name="inputnode",
@@ -80,7 +83,10 @@ def init_output_wf(subject_id, session_id, output_folder):
                     ("out_eddy_qc", "@result.@eddyqc"),
                     ("out_FA", "@result.@fa"),
                     ("out_V1", "@result.@v1"),
+                    ("out_sse", "@result.@sse"),
                     ("out_sh_residual", "@result.@residual"),
+                    ("out_eddy_b0", "@result.@eddyb0"),
+                    ("out_eddy_qc_folder", "@result.@eddyqcfolder"),
                 ],
             ),
         ]

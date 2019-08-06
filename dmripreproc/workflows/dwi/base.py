@@ -42,7 +42,13 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             fmap["metadata"] = parameters.layout.get_metadata(fmap[fmap["suffix"]])
 
     sdc_wf = init_sdc_prep_wf(
-        subject_id, fmaps, metadata, parameters.layout, parameters.bet_mag, synb0
+        subject_id,
+        fmaps,
+        metadata,
+        parameters.layout,
+        parameters.bet_mag,
+        synb0=synb0,
+        acqp_file=parameters.acqp_file,
     )
 
     dwi_wf = pe.Workflow(name="dwi_preproc_wf")
@@ -63,7 +69,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
     )
 
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["out_file", "out_mask", "out_bvec"]),
+        niu.IdentityInterface(fields=["out_file", "out_mask", "out_bvec", "out_qc_folder"]),
         name="outputnode",
     )
 
@@ -191,6 +197,15 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         name="b0_avg_pre",
     )
 
+    eddy_avg_b0 = pe.Node(
+        niu.Function(
+            input_names=["in_dwi", "in_bval"],
+            output_names=["out_file"],
+            function=b0_average,
+        ),
+        name="eddy_avg_b0",
+    )
+
     # dilate mask
     bet_dwi0 = pe.Node(
         fsl.BET(frac=parameters.bet_dwi, mask=True, robust=True),
@@ -289,6 +304,11 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             dwi_wf.connect(
                 [
                     (sdc_wf, ecc, [(("outputnode.out_fmap", get_path), "field")]),
+                    (
+                        inputnode,
+                        acqp,
+                        [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
+                    ),
                     (acqp, ecc, [("out_file", "in_acqp")]),
                     (acqp, eddy_quad, [("out_file", "param_file")])
                 ]
@@ -311,11 +331,6 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             (inputnode, avg_b0_0, [("bval_file", "in_bval")]),
             (avg_b0_0, bet_dwi0, [("out_file", "in_file")]),
             (inputnode, gen_idx, [("dwi_file", "in_file")]),
-            (
-                inputnode,
-                acqp,
-                [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
-            ),
             (dwi_prep_wf, ecc, [("dwi_prep_outputnode.out_file", "in_file")]),
             (
                 inputnode,
@@ -351,6 +366,10 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             ),
             (b0mask_node, dtifit, [("mask_file", "mask")]),
             (inputnode, dtifit, [("bval_file", "bvals")]),
+            # New avg b0 for eddy
+            (ecc, eddy_avg_b0, [("out_corrected", "in_dwi")]),
+            (inputnode, eddy_avg_b0, [("bval_file", "in_bval")]),
+            (ecc, outputnode, [(("out_corrected", get_qc_path), "out_qc_folder")]),
         ]
     )
 

@@ -101,10 +101,14 @@ def init_single_subject_wf(subject_id, name, parameters):
                         ("inputnode.bval_file", "inputnode.out_bval"),
                         ("bet_dwi_pre.out_file", "inputnode.out_b0_brain"),
                         ("bet_dwi_pre.mask_file", "inputnode.out_b0_mask"),
-                        ("eddy_quad.qc_json", "inputnode.out_eddy_qc"),
                         ("dtifit.FA", "inputnode.out_FA"),
                         ("dtifit.V1", "inputnode.out_V1"),
                         ("denoise_eddy.noise", "inputnode.out_sh_residual"),
+                        # Dtifit SSE
+                        ("dtifit.sse", "inputnode.out_sse"),
+                        ("eddy_avg_b0.out_file", "inputnode.out_eddy_b0"),
+                        # Eddy qc
+                        ("outputnode.out_qc_folder", "inputnode.out_eddy_qc_folder"),
                     ],
                 )
             ]

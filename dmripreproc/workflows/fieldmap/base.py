@@ -12,7 +12,8 @@ def init_sdc_prep_wf(
     metadata,
     layout,
     bet_mag_frac,
-    synb0,
+    synb0="",
+    acqp_file="",
     omp_nthreads=1,
     fmap_bspline=False,
 ):
@@ -43,7 +44,7 @@ def init_sdc_prep_wf(
     if (synb0):
         from .pepolar import init_synb0_wf
 
-        synb0_wf = init_synb0_wf(subject_id, metadata, synb0)
+        synb0_wf = init_synb0_wf(subject_id, metadata, synb0, acqp_file)
 
         sdc_prep_wf.connect(
             [
