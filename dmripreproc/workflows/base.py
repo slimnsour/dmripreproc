@@ -20,7 +20,7 @@ def init_dmripreproc_wf(parameters):
         )
 
         single_subject_wf.config["execution"]["crashdump_dir"] = os.path.join(
-            parameters.output_dir, "dmriprep", "sub-" + subject_id, "log"
+            parameters.output_dir, "dmriprep_crash", "sub-" + subject_id, "log"
         )
 
         for node in single_subject_wf._get_all_nodes():
@@ -104,11 +104,14 @@ def init_single_subject_wf(subject_id, name, parameters):
                         ("dtifit.FA", "inputnode.out_FA"),
                         ("dtifit.V1", "inputnode.out_V1"),
                         ("denoise_eddy.noise", "inputnode.out_sh_residual"),
+                        ("denoise_eddy_mask.out_file", "inputnode.out_sh_residual_mask"),
                         # Dtifit SSE
                         ("dtifit.sse", "inputnode.out_sse"),
                         ("eddy_avg_b0.out_file", "inputnode.out_eddy_b0"),
+                        ("geteddyB0Mask.mask_file", "inputnode.out_eddy_b0_mask"),
                         # Eddy qc
-                        ("outputnode.out_qc_folder", "inputnode.out_eddy_qc_folder"),
+                        ("eddy_quad.qc_json", "inputnode.out_eddy_qc_json"),
+                        ("eddy_quad.qc_pdf", "inputnode.out_eddy_qc_pdf")
                     ],
                 )
             ]

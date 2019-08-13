@@ -230,6 +230,8 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
 
     denoise_eddy = pe.Node(mrtrix3.DWIDenoise(), name="denoise_eddy")
 
+    denoise_eddy_mask = pe.Node(fsl.ApplyMask(), name="denoise_eddy_mask")
+
     eddy_quad = pe.Node(fsl.EddyQuad(verbose=True), name="eddy_quad")
 
     get_path = lambda x: x.split(".nii.gz")[0].split("_fix")[0]
@@ -261,6 +263,15 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             function=get_b0_mask_fn,
         ),
         name="getB0Mask",
+    )
+
+    eddy_b0mask_node = pe.Node(
+        niu.Function(
+            input_names=["b0_file"],
+            output_names=["mask_file"],
+            function=get_b0_mask_fn,
+        ),
+        name="geteddyB0Mask",
     )
 
     # If synb0 is meant to be used
@@ -368,8 +379,11 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             (inputnode, dtifit, [("bval_file", "bvals")]),
             # New avg b0 for eddy
             (ecc, eddy_avg_b0, [("out_corrected", "in_dwi")]),
+            (eddy_avg_b0, eddy_b0mask_node, [("out_file", "b0_file")]),
+            (denoise_eddy, denoise_eddy_mask, [("noise", "in_file")]),
+            (eddy_b0mask_node, denoise_eddy_mask, [("mask_file", "mask_file")]),
             (inputnode, eddy_avg_b0, [("bval_file", "in_bval")]),
-            (ecc, outputnode, [(("out_corrected", get_qc_path), "out_qc_folder")]),
+            #(ecc, outputnode, [(("out_corrected", get_qc_path), "out_qc_folder")]),
         ]
     )
 
