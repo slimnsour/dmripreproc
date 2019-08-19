@@ -73,7 +73,7 @@ def init_pepolar_wf(subject_id, dwi_meta, epi_fmaps):
 
     return wf
 
-def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file):
+def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file, ignore_nodes):
     file2dir = dict()
 
     usable_fieldmaps_matching_pe = []
@@ -85,7 +85,7 @@ def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file):
 
     outputnode = pe.Node(niu.IdentityInterface(fields=["out_topup", "out_movpar", "out_fmap", "out_enc_file"]), name = "outputnode")
 
-    topup_wf = init_topup_wf(use_acqp=True)
+    topup_wf = init_topup_wf(ignore_nodes=ignore_nodes, use_acqp=True)
     topup_wf.inputs.inputnode.altepi_file = synb0
     wf.add_nodes([inputnode])
     wf.connect(
@@ -111,7 +111,7 @@ def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file):
 
     return wf
 
-def init_topup_wf(use_acqp=False):
+def init_topup_wf(ignore_nodes="r", use_acqp=False):
     from ...interfaces import mrtrix3
 
     wf = pe.Workflow(name="topup_wf")
@@ -166,8 +166,6 @@ def init_topup_wf(use_acqp=False):
             ),
             (epi_flirt, list_merge, [("out_file", "in2")]),
             (list_merge, merge, [("out", "in_files")]),
-            (merge, resize, [("merged_file", "in_file")]),
-            (resize, topup, [("out_file", "in_file")]),
             (
                 topup,
                 outputnode,
@@ -180,5 +178,20 @@ def init_topup_wf(use_acqp=False):
             ),
         ]
     )
+    # If resize is meant to be ignored
+    if "r" in ignore_nodes:
+        wf.connect(
+            [
+                (merge, topup, [("merged_file", "in_file")])
+            ]
+        )
+    # Otherwise (use resize)
+    else:
+        wf.connect(
+            [
+                (merge, resize, [("merged_file", "in_file")]),
+                (resize, topup, [("out_file", "in_file")]),
+            ]
+        )
 
     return wf

@@ -49,6 +49,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         parameters.bet_mag,
         synb0=synb0,
         acqp_file=parameters.acqp_file,
+        ignore_nodes=parameters.ignore_nodes
     )
 
     dwi_wf = pe.Workflow(name="dwi_preproc_wf")
