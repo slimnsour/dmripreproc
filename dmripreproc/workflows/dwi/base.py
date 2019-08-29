@@ -18,11 +18,11 @@ from ...interfaces import fsl as dmri_fsl
 from ..fieldmap.base import init_sdc_prep_wf
 from .dwiprep import init_dwiprep_wf
 
+from niworkflows.anat.ants import init_brain_extraction_wf
+
 FMAP_PRIORITY = {"epi": 0, "fieldmap": 1, "phasediff": 2, "phase": 3, "syn": 4}
 
 def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
-
-
     fmaps = []
     synb0 = ""
 
@@ -275,6 +275,10 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         name="geteddyB0Mask",
     )
 
+    t1_skullstrip = init_brain_extraction_wf()
+
+    to_list = lambda x: [x]
+
     # If synb0 is meant to be used
     if parameters.synb0_dir:
         dwi_wf.connect(
@@ -313,18 +317,31 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             )
         # Otherwise (fieldmaps)
         else:
-            dwi_wf.connect(
-                [
-                    (sdc_wf, ecc, [(("outputnode.out_fmap", get_path), "field")]),
-                    (
-                        inputnode,
-                        acqp,
-                        [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
-                    ),
-                    (acqp, ecc, [("out_file", "in_acqp")]),
-                    (acqp, eddy_quad, [("out_file", "param_file")])
-                ]
-            )
+            if not(parameters.avoid_fieldmap_eddy):
+                dwi_wf.connect(
+                    [
+                        (sdc_wf, ecc, [(("outputnode.out_fmap", get_path), "field")]),
+                        (
+                            inputnode,
+                            acqp,
+                            [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
+                        ),
+                        (acqp, ecc, [("out_file", "in_acqp")]),
+                        (acqp, eddy_quad, [("out_file", "param_file")])
+                    ]
+                )
+            else:
+                dwi_wf.connect(
+                    [
+                        (
+                            inputnode,
+                            acqp,
+                            [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
+                        ),
+                        (acqp, ecc, [("out_file", "in_acqp")]),
+                        (acqp, eddy_quad, [("out_file", "param_file")])
+                    ]
+                )
 
     dtifit = pe.Node(fsl.DTIFit(save_tensor=True, sse=True), name="dtifit")
 
@@ -384,8 +401,14 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             (denoise_eddy, denoise_eddy_mask, [("noise", "in_file")]),
             (eddy_b0mask_node, denoise_eddy_mask, [("mask_file", "mask_file")]),
             (inputnode, eddy_avg_b0, [("bval_file", "in_bval")]),
-            #(ecc, outputnode, [(("out_corrected", get_qc_path), "out_qc_folder")]),
         ]
     )
+
+    if (parameters.skullstrip_t1):
+        dwi_wf.connect(
+            [
+                (inputnode, t1_skullstrip, [(("t1_file", to_list), "inputnode.in_files")])
+            ]
+        )
 
     return dwi_wf

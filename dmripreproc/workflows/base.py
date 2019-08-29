@@ -51,10 +51,25 @@ def init_single_subject_wf(subject_id, name, parameters):
 
     for dwi_file in dwi_files:
         entities = parameters.layout.parse_file_entities(dwi_file)
+        # Get T1 for subject
         if "session" in entities:
             session_id = entities["session"]
+            t1_file = parameters.layout.get(
+                subject=subject_id,
+                session=session_id,
+                suffix="T1w",
+                extensions=[".nii", ".nii.gz"],
+                return_type="filename"
+            )[0]
         else:
             session_id = "01"
+            t1_file = parameters.layout.get(
+                subject=subject_id,
+                suffix="T1w",
+                extensions=[".nii", ".nii.gz"],
+                return_type="filename"
+            )[0]
+
         metadata = parameters.layout.get_metadata(dwi_file)
         dwi_preproc_wf = init_dwi_preproc_wf(
             subject_id=subject_id,

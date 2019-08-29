@@ -96,6 +96,16 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
     default=None,
     type=(str),
 )
+@click.option(
+    "--avoid_fieldmap_eddy",
+    help="If you want eddy to use the fieldmap/topup parameter",
+    is_flag=True
+)
+@click.option(
+    "--skullstrip_t1",
+    help="If you want to skullstrip your T1 alongside dmriprep",
+    is_flag=True
+)
 @click.argument("bids_dir")
 @click.argument("output_dir")
 @click.argument(
@@ -116,6 +126,8 @@ def main(
     analysis_level="participant",
     synb0_dir=None,
     acqp_file=None,
+    avoid_fieldmap_eddy=True,
+    skullstrip_t1=False,
 ):
     """
     BIDS_DIR: The directory with the input dataset formatted according to
@@ -138,7 +150,7 @@ def main(
         )
 
     layout = BIDSLayout(bids_dir, validate=False)
-    print(layout)
+    
     subject_list = utils.collect_participants(
         layout, participant_label=participant_label
     )
@@ -161,6 +173,8 @@ def main(
     parameters.analysis_level = analysis_level
     parameters.synb0_dir = synb0_dir
     parameters.acqp_file = acqp_file
+    parameters.avoid_fieldmap_eddy = avoid_fieldmap_eddy
+    parameters.skullstrip_t1 = skullstrip_t1
 
     wf = init_dmripreproc_wf(parameters)
     wf.write_graph(graph2use="colored")

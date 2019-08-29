@@ -19,6 +19,7 @@ requirements = [
     "parse",
     "tqdm",
     "pybids>=0.9.1",
+    "niworkflows>=0.10.3rc1",
     "matplotlib",
     "numba",
     "sphinx",
