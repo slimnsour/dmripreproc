@@ -194,6 +194,12 @@ class EddyOutputSpec(TraitedSpec):
         exists=True, desc='path/name of file with the cnr_maps')
     out_residuals = File(
         exists=True, desc='path/name of file with the residuals')
+    out_outlier_map = File(
+        exists=True, desc='outlier map')
+    out_n_sqr_outlier_map = File(
+        exists=True, desc='n sqr outlier map')
+    out_n_outlier_map = File(
+        exists=True, desc='n outlier map')
 
 
 class Eddy(FSLCommand):
@@ -293,6 +299,12 @@ class Eddy(FSLCommand):
             self.inputs.out_base)
         out_outlier_report = os.path.abspath(
             '%s.eddy_outlier_report' % self.inputs.out_base)
+        out_outlier_map = os.path.abspath(
+            '%s.eddy_outlier_map' % self.inputs.out_base)
+        out_n_sqr_outlier_map = os.path.abspath(
+            '%s.eddy_outlier_n_sqr_stdev_map' % self.inputs.out_base)
+        out_n_outlier_map = os.path.abspath(
+            '%s.eddy_outlier_n_stdev_map' % self.inputs.out_base)
         if isdefined(self.inputs.cnr_maps) and self.inputs.cnr_maps:
             out_cnr_maps = os.path.abspath(
                 '%s.eddy_cnr_maps.nii.gz' % self.inputs.out_base)
@@ -316,6 +328,12 @@ class Eddy(FSLCommand):
                 out_shell_alignment_parameters
         if os.path.exists(out_outlier_report):
             outputs['out_outlier_report'] = out_outlier_report
+        if os.path.exists(out_outlier_map):
+            outputs['out_outlier_map'] = out_outlier_map
+        if os.path.exists(out_n_sqr_outlier_map):
+            outputs['out_n_sqr_outlier_map'] = out_n_sqr_outlier_map
+        if os.path.exists(out_n_outlier_map):
+            outputs['out_n_outlier_map'] = out_n_outlier_map
 
         return outputs
 
