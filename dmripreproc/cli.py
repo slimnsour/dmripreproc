@@ -63,7 +63,7 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
     default=0.3,
 )
 @click.option(
-    "--total-readout",
+    "--total_readout",
     help="Manual option for what value will be used in acquired params step. "
     "If this parameter is not provided the value will be taken from the "
     "TotalReadoutTime field in the dwi json. ",
@@ -150,7 +150,7 @@ def main(
         )
 
     layout = BIDSLayout(bids_dir, validate=False)
-    
+
     subject_list = utils.collect_participants(
         layout, participant_label=participant_label
     )
