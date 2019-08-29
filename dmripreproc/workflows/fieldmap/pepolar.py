@@ -81,22 +81,24 @@ def init_synb0_wf(subject_id, dwi_meta, synb0, acqp_file, ignore_nodes):
 
     wf = pe.Workflow(name="synb0_wf")
 
-    inputnode = pe.Node(niu.IdentityInterface(fields=["b0_stripped"]), name = "inputnode")
+    inputnode = pe.Node(niu.IdentityInterface(fields=["b0_stripped", "acqp"]), name = "inputnode")
 
     outputnode = pe.Node(niu.IdentityInterface(fields=["out_topup", "out_movpar", "out_fmap", "out_enc_file"]), name = "outputnode")
 
     topup_wf = init_topup_wf(ignore_nodes=ignore_nodes, use_acqp=True)
     topup_wf.inputs.inputnode.altepi_file = synb0
     wf.add_nodes([inputnode])
-    wf.connect(
-        [
-            (inputnode, topup_wf, [("b0_stripped", "inputnode.epi_file")])
-        ]
-    )
-    topup_wf.inputs.inputnode.acqp = acqp_file
 
     wf.connect(
         [
+            (
+                inputnode,
+                topup_wf,
+                [
+                    ("b0_stripped", "inputnode.epi_file"),
+                    ("acqp", "inputnode.acqp")
+                ]
+            ),
             (
                 topup_wf,
                 outputnode,

@@ -22,7 +22,7 @@ def init_sdc_prep_wf(
     sdc_prep_wf = pe.Workflow(name="sdc_prep_wf")
 
     inputnode = pe.Node(
-        niu.IdentityInterface(fields=["b0_stripped"]), name="inputnode"
+        niu.IdentityInterface(fields=["b0_stripped", "acqp"]), name="inputnode"
     )
 
     outputnode = pe.Node(
@@ -52,7 +52,10 @@ def init_sdc_prep_wf(
                 (
                     inputnode,
                     synb0_wf,
-                    [("b0_stripped", "inputnode.b0_stripped")],
+                    [
+                        ("b0_stripped", "inputnode.b0_stripped"),
+                        ("acqp", "inputnode.acqp"),
+                    ],
                 ),
                 (
                     synb0_wf,

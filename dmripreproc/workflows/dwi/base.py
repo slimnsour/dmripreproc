@@ -48,7 +48,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         parameters.layout,
         parameters.bet_mag,
         synb0=synb0,
-        acqp_file=parameters.acqp_file,
+        #acqp_file=parameters.acqp_file,
         ignore_nodes=parameters.ignore_nodes
     )
 
@@ -152,7 +152,50 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         name="acqp",
     )
 
+    def synb0_gen_acqparams(in_file, metadata, total_readout_time):
+        import os
+        import numpy as np
+        import nibabel as nib
+        from nipype.utils.filemanip import fname_presuffix
+
+        out_file = fname_presuffix(
+            in_file,
+            suffix="_acqparams.txt",
+            newpath=os.path.abspath("."),
+            use_ext=False,
+        )
+
+        acq_param_template = [
+            "0 -1 0 %.7f\n",
+            "0 1 0 0"
+        ]
+
+        pe_dir = metadata.get("PhaseEncodingDirection")
+
+        if total_readout_time:
+            total_readout = total_readout_time
+        else:
+            total_readout = metadata.get("TotalReadoutTime")
+
+        acq_param_template[0] = acq_param_template[0] % total_readout
+
+        with open(out_file, "w") as f:
+            for line in acq_param_template:
+                f.write(line)
+
+        return out_file
+
+    synb0_acqp = pe.Node(
+        niu.Function(
+            input_names=["in_file", "metadata", "total_readout_time"],
+            output_names=["out_file"],
+            function=synb0_gen_acqparams,
+        ),
+        name="synb0_acqp",
+    )
+
     acqp.inputs.total_readout_time = parameters.total_readout
+    synb0_acqp.inputs.total_readout_time = parameters.total_readout
 
     def b0_average(in_dwi, in_bval, b0_thresh=10.0, out_file=None):
         """
@@ -283,6 +326,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
     if parameters.synb0_dir:
         dwi_wf.connect(
             [
+                (synb0_acqp, sdc_wf, [("out_file", "inputnode.acqp")]),
                 (
                     sdc_wf,
                     ecc,
@@ -290,11 +334,16 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
                         ("outputnode.out_topup", "in_topup_fieldcoef"),
                         ("outputnode.out_movpar", "in_topup_movpar"),
                     ],
-                )
+                ),
+                (
+                    inputnode,
+                    synb0_acqp,
+                    [("dwi_file", "in_file"), ("dwi_meta", "metadata")],
+                ),
+                (synb0_acqp, ecc, [("out_file", "in_acqp")]),
+                (synb0_acqp, eddy_quad, [("out_file", "param_file")])
             ]
         )
-        ecc.inputs.in_acqp = parameters.acqp_file
-        eddy_quad.inputs.param_file = parameters.acqp_file
     else:
         # Decide what ecc will take: topup or fmap
         fmaps.sort(key=lambda fmap: FMAP_PRIORITY[fmap["suffix"]])
