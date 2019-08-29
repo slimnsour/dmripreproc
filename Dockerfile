@@ -234,6 +234,4 @@ RUN mkdir dmripreproc
 COPY ./ dmripreproc/
 RUN cd dmripreproc && python setup.py install && pip list
 
-# Copy template files and atlases to other fsl path
-
 ENTRYPOINT ["dmripreproc"]
