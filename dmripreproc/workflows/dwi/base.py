@@ -131,6 +131,9 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
 
         pe_dir = metadata.get("PhaseEncodingDirection")
 
+        if not(pe_dir):
+            pe_dir = metadata.get("PhaseEncodingAxis")
+
         if total_readout_time:
             total_readout = total_readout_time
         else:
