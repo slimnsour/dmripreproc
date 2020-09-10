@@ -37,7 +37,7 @@ def init_single_subject_wf(subject_id, name, parameters):
         subject=subject_id,
         datatype="dwi",
         suffix="dwi",
-        extensions=[".nii", ".nii.gz"],
+        extension=["nii", "nii.gz"],
         return_type="filename"
     )
 
@@ -58,7 +58,7 @@ def init_single_subject_wf(subject_id, name, parameters):
                 subject=subject_id,
                 session=session_id,
                 suffix="T1w",
-                extensions=[".nii", ".nii.gz"],
+                extension=[".nii", ".nii.gz"],
                 return_type="filename"
             )[0]
         else:
@@ -66,7 +66,7 @@ def init_single_subject_wf(subject_id, name, parameters):
             t1_file = parameters.layout.get(
                 subject=subject_id,
                 suffix="T1w",
-                extensions=[".nii", ".nii.gz"],
+                extension=[".nii", ".nii.gz"],
                 return_type="filename"
             )[0]
 
@@ -90,6 +90,7 @@ def init_single_subject_wf(subject_id, name, parameters):
         inputspec = dwi_preproc_wf.get_node("inputnode")
         inputspec.inputs.subject_id = subject_id
         inputspec.inputs.dwi_file = dwi_file
+        inputspec.inputs.t1_file = t1_file
         inputspec.inputs.dwi_meta = metadata
         inputspec.inputs.bvec_file = parameters.layout.get_bvec(dwi_file)
         inputspec.inputs.bval_file = parameters.layout.get_bval(dwi_file)

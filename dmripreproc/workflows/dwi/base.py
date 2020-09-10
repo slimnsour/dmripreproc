@@ -7,7 +7,6 @@ import numpy as np
 import nibabel as nib
 from nipype.pipeline import engine as pe
 from nipype.interfaces import fsl, utility as niu
-from nipype.utils import NUMPY_MMAP
 from nipype.utils.filemanip import fname_presuffix
 from dipy.segment.mask import median_otsu
 from numba import cuda
@@ -83,7 +82,6 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         import nibabel as nib
         from nipype.pipeline import engine as pe
         from nipype.interfaces import fsl, utility as niu
-        from nipype.utils import NUMPY_MMAP
         from nipype.utils.filemanip import fname_presuffix
 
         out_file = fname_presuffix(
@@ -92,7 +90,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
             newpath=os.path.abspath("."),
             use_ext=False,
         )
-        vols = nib.load(in_file, mmap=NUMPY_MMAP).get_data().shape[-1]
+        vols = nib.load(in_file).shape[-1]
         index_lines = np.ones((vols,))
         index_lines_reshape = index_lines.reshape(1, index_lines.shape[0])
         np.savetxt(out_file, index_lines_reshape, fmt="%i")
@@ -170,7 +168,6 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         import nibabel as nib
         from nipype.pipeline import engine as pe
         from nipype.interfaces import fsl, utility as niu
-        from nipype.utils import NUMPY_MMAP
         from nipype.utils.filemanip import fname_presuffix
 
         if out_file is None:
@@ -178,7 +175,7 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
                 in_dwi, suffix="_avg_b0", newpath=os.path.abspath(".")
             )
 
-        imgs = np.array(nib.four_to_three(nib.load(in_dwi, mmap=NUMPY_MMAP)))
+        imgs = np.array(nib.four_to_three(nib.load(in_dwi)))
         bval = np.loadtxt(in_bval)
         index = np.argwhere(bval <= b0_thresh).flatten().tolist()
 
