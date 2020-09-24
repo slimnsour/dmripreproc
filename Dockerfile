@@ -1,4 +1,4 @@
-FROM ubuntu:xenial-20161213
+FROM ubuntu:xenial-20191010
 
 # Used command:
 # neurodocker generate docker --base=debian:stretch --pkg-manager=apt
@@ -47,8 +47,6 @@ RUN export ND_ENTRYPOINT="/neurodocker/startup.sh" \
     fi \
     && chmod -R 777 /neurodocker && chmod a+s /neurodocker
 
-ENTRYPOINT ["/neurodocker/startup.sh"]
-
 # SETUP taken from fmriprep:latest, installs C compiler for ANTS
 # Prepare environment
 RUN apt-get update && \
@@ -66,7 +64,7 @@ RUN apt-get update && \
     curl -sL https://deb.nodesource.com/setup_10.x | bash - && \
     apt-get install -y --no-install-recommends \
                     nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Install latest pandoc
 RUN curl -o pandoc-2.2.2.1-1-amd64.deb -sSL "https://github.com/jgm/pandoc/releases/download/2.2.2.1/pandoc-2.2.2.1-1-amd64.deb" && \
@@ -205,6 +203,7 @@ RUN pip install --no-cache-dir "templateflow>=0.3.0,<0.4.0a0" && \
     find $TEMPLATEFLOW_HOME -type f -exec chmod go=u {} +
 
 RUN conda install -y python=3.7.3 \
+                     numba=0.51.2 \
                      pip=19.1 \
                      libxml2=2.9.8 \
                      libxslt=1.1.32 \
@@ -214,24 +213,9 @@ RUN conda install -y python=3.7.3 \
     conda build purge-all; sync && \
     conda clean -tipsy && sync
 
+RUN mkdir /dmripreproc
+COPY ./ /dmripreproc/
 
-# Setting up an install of dmripreproc (manual version) inside the container
-#ADD https://api.github.com/repos/TIGRLab/dmripreproc/git/refs/heads/master version.json
-#RUN git clone -b master https://github.com/TIGRLab/dmripreproc.git dmripreproc
-
-# Following two lines assumes you are building from within a pulled dmripreproc repo
-
-RUN pip install --upgrade pip
-RUN pip install \
-    numba==0.45.0 \
-    Click==7.0 \
-    dipy==0.16.0 \
-    pybids==0.9.2 \
-    nipype==1.2.0 \
-    niworkflows==0.10.2
-
-RUN mkdir dmripreproc
-COPY ./ dmripreproc/
-RUN cd dmripreproc && python setup.py install && pip list
+RUN cd dmripreproc && pip install . && pip list
 
 ENTRYPOINT ["dmripreproc"]
