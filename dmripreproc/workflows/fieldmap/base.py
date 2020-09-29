@@ -13,7 +13,7 @@ def init_sdc_prep_wf(
     layout,
     bet_mag_frac,
     synb0="",
-    acqp_file="",
+    acqp_file=None,
     ignore_nodes="r",
     omp_nthreads=1,
     fmap_bspline=False,
@@ -79,7 +79,7 @@ def init_sdc_prep_wf(
                 if fmap_["suffix"] == "epi"
             ]
 
-            pepolar_wf = init_pepolar_wf(subject_id, metadata, epi_fmaps)
+            pepolar_wf = init_pepolar_wf(subject_id, metadata, epi_fmaps, acqp_file)
 
             sdc_prep_wf.connect(
                 [

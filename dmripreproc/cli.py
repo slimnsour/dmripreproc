@@ -106,6 +106,12 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
     help="If you want to skullstrip your T1 alongside dmriprep",
     is_flag=True
 )
+@click.option(
+    "--use_cuda",
+    help="If you want to use cuda for eddy. Note you will need to have"
+    "the cuda module loaded for this to work.",
+    is_flag=True
+)
 @click.argument("bids_dir")
 @click.argument("output_dir")
 @click.argument(
@@ -128,6 +134,7 @@ def main(
     acqp_file=None,
     avoid_fieldmap_eddy=True,
     skullstrip_t1=False,
+    use_cuda=False,
 ):
     """
     BIDS_DIR: The directory with the input dataset formatted according to
@@ -158,6 +165,7 @@ def main(
     work_dir = os.path.join(output_dir, "scratch")
 
     # Set parameters based on CLI, pass through object
+    # Can update/add parameters in utils.py
     parameters = utils.Parameters()
     parameters.participant_label = participant_label
     parameters.layout = layout
@@ -175,6 +183,7 @@ def main(
     parameters.acqp_file = acqp_file
     parameters.avoid_fieldmap_eddy = avoid_fieldmap_eddy
     parameters.skullstrip_t1 = skullstrip_t1
+    parameters.use_cuda = use_cuda
 
     wf = init_dmripreproc_wf(parameters)
     wf.write_graph(graph2use="colored")

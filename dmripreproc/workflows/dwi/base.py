@@ -13,6 +13,7 @@ from numba import cuda
 from bids import BIDSLayout
 
 from ...interfaces import mrtrix3
+import nipype.interfaces.mrtrix3 as mrt
 from ...interfaces import fsl as dmri_fsl
 from ..fieldmap.base import init_sdc_prep_wf
 from .dwiprep import init_dwiprep_wf
@@ -69,12 +70,51 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
     )
 
     outputnode = pe.Node(
-        niu.IdentityInterface(fields=["out_file", "out_mask", "out_bvec", "out_qc_folder"]),
+        niu.IdentityInterface(
+            fields=[
+                "out_corrected", 
+                "out_mask", 
+                "out_bvec", 
+                "out_bval", 
+                "out_b0_avg", 
+                "out_qc_folder",
+                "out_FA",
+                "out_V1",
+                "out_MD",
+                "out_L1",
+                "out_RD",
+                ]
+            ),
         name="outputnode",
     )
 
     # Create the dwi prep workflow
     dwi_prep_wf = init_dwiprep_wf(parameters.ignore_nodes)
+
+    # Resize the dwi after preprocessing it
+    dwi_resize = pe.Node(fsl.ExtractROI(x_min=0, x_size=140, y_min=0, y_size=140, z_min=0, z_size=80), name="dwi_resize")
+
+    # Extract b0s from the dwi using mrtrix3
+    dwi_extract_b0 = pe.Node(mrtrix3.DWIExtract(bzero=True), name="dwi_extract_b0")
+
+    # Avg out the b0s 
+    dwi_avg_b0 = pe.Node(mrtrix3.MRMath(operation='mean', axis=3), name="dwi_avg_b0")
+
+    # Combine bval and bvec
+    #grad_merge = pe.Node(niu.Merge(numinputs=2), name="grad_merge")
+    def tuple_merge(in1, in2):
+        out = (in1, in2)
+        return out
+
+    grad_merge = pe.Node(
+        niu.Function(
+            input_names=["in1", "in2"],
+            output_names=["out"],
+            function=tuple_merge,
+        ),
+        name="grad_merge",
+    )
+
 
     def gen_index(in_file):
         import os
@@ -198,36 +238,54 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         name="b0_avg_pre",
     )
 
-    eddy_avg_b0 = pe.Node(
+    # eddy_avg_b0 = pe.Node(
+    #     niu.Function(
+    #         input_names=["in_dwi", "in_bval"],
+    #         output_names=["out_file"],
+    #         function=b0_average,
+    #     ),
+    #     name="eddy_avg_b0",
+    # )
+
+    # Merge the bvec and bval from eddy
+    eddy_grad_merge = pe.Node(
         niu.Function(
-            input_names=["in_dwi", "in_bval"],
-            output_names=["out_file"],
-            function=b0_average,
+            input_names=["in1", "in2"],
+            output_names=["out"],
+            function=tuple_merge,
         ),
-        name="eddy_avg_b0",
+        name="eddy_grad_merge",
     )
 
+    # Extract b0s from the eddy using mrtrix3
+    eddy_extract_b0 = pe.Node(mrtrix3.DWIExtract(bzero=True), name="eddy_extract_b0")
+
+    # Avg out the b0s from eddy
+    eddy_mean_b0 = pe.Node(mrtrix3.MRMath(operation='mean', axis=3), name="eddy_mean_b0")
+
     # dilate mask
-    bet_dwi0 = pe.Node(
+    bet_dwi_pre = pe.Node(
         fsl.BET(frac=parameters.bet_dwi, mask=True, robust=True),
         name="bet_dwi_pre",
+    )
+
+    # dilate mask (eddy)
+    eddy_b0_mask = pe.Node(
+        fsl.BET(frac=parameters.bet_dwi, mask=True, robust=True),
+        name="eddy_b0_mask",
     )
 
     # mrtrix3.MaskFilter
 
     ecc = pe.Node(
-        dmri_fsl.Eddy(repol=True, cnr_maps=True, residuals=True, method="jac"),
+        dmri_fsl.Eddy(repol=True, cnr_maps=True, residuals=True, is_shelled=True),
         name="fsl_eddy",
     )
 
     # if nthreads not specified, do this
     ecc.inputs.num_threads = multiprocessing.cpu_count()
 
-    try:
-        if cuda.gpus:
-            ecc.inputs.use_cuda = True
-    except:
-        ecc.inputs.use_cuda = False
+    ecc.inputs.use_cuda = parameters.use_cuda
 
     denoise_eddy = pe.Node(mrtrix3.DWIDenoise(), name="denoise_eddy")
 
@@ -299,25 +357,34 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
         # Decide what ecc will take: topup or fmap
         fmaps.sort(key=lambda fmap: FMAP_PRIORITY[fmap["suffix"]])
         fmap = fmaps[0]
-        # Else If epi files detected
+        # Else if epi files detected
         if fmap["suffix"] == "epi":
             dwi_wf.connect(
                 [
                     (
-                        sdc_wf,
-                        ecc,
+                        sdc_wf, ecc,
                         [
                             ("outputnode.out_topup", "in_topup_fieldcoef"),
-                            ("outputnode.out_enc_file", "in_acqp"),
                             ("outputnode.out_movpar", "in_topup_movpar"),
                         ],
-                    ),
-                    (sdc_wf, eddy_quad, [("outputnode.out_enc_file", "param_file")])
+                    )
                 ]
             )
+            if (parameters.acqp_file):
+                ecc.inputs.in_acqp = parameters.acqp_file
+                eddy_quad.inputs.param_file = parameters.acqp_file
+            else:
+                dwi_wf.connect(
+                    [
+                        (sdc_wf, ecc, [("outputnode.out_enc_file", "in_acqp")]),
+                        (sdc_wf, eddy_quad, [("outputnode.out_enc_file", "param_file")])
+                    ]
+                )
         # Otherwise (fieldmaps)
         else:
             if not(parameters.avoid_fieldmap_eddy):
+                # If an acqp file is provided, use that
+                # Otherwise use acqp node
                 dwi_wf.connect(
                     [
                         (sdc_wf, ecc, [(("outputnode.out_fmap", get_path), "field")]),
@@ -345,6 +412,10 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
 
     dtifit = pe.Node(fsl.DTIFit(save_tensor=True, sse=True), name="dtifit")
 
+    dtifit_merge = pe.Node(niu.Merge(numinputs=2), name="dtifit_merge")
+
+    dtifit_RD = pe.Node(fsl.MultiImageMaths(op_string = "-add %s -div 2", out_file="dtifit_RD.nii.gz"), name="dtifit_RD")
+
     dwi_wf.connect(
         [
             (
@@ -357,20 +428,41 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
                 avg_b0_0,
                 [("dwi_prep_outputnode.out_file", "in_dwi")],
             ),
+            # Combining the bval and bvec
+            (
+                inputnode, grad_merge,
+                [("bvec_file", "in1"), ("bval_file", "in2")]
+            ),
+
+            # Resizing the dwi file
+            (dwi_prep_wf, dwi_resize, [("dwi_prep_outputnode.out_file", "in_file")]),
+
+            # Extracting b0 from dwi
+            (dwi_resize, dwi_extract_b0, [("roi_file", "in_file")]),
+            (grad_merge, dwi_extract_b0, [("out", "grad_fsl")]),
+            # Averaging out b0 from nipype function
             (inputnode, avg_b0_0, [("bval_file", "in_bval")]),
-            (avg_b0_0, bet_dwi0, [("out_file", "in_file")]),
+            #(avg_b0_0, bet_dwi_pre, [("out_file", "in_file")]),
+            # Averaging out b0 from mrmath
+            (dwi_extract_b0, dwi_avg_b0, [("out_file", "in_file")]),
+            # Skulstrip b0 using BET
+            (dwi_avg_b0, bet_dwi_pre, [("out_file", "in_file")]),
+
+            # Generating the index file for eddy
             (inputnode, gen_idx, [("dwi_file", "in_file")]),
-            (dwi_prep_wf, ecc, [("dwi_prep_outputnode.out_file", "in_file")]),
+            # Feed in values for eddy
+            #(dwi_prep_wf, ecc, [("dwi_prep_outputnode.out_file", "in_file")]),
+            (dwi_resize, ecc, [("roi_file", "in_file")]),
             (
                 inputnode,
                 ecc,
                 [("bval_file", "in_bval"), ("bvec_file", "in_bvec")],
             ),
-            (bet_dwi0, ecc, [("mask_file", "in_mask")]),
+            (bet_dwi_pre, ecc, [("mask_file", "in_mask")]),
             (gen_idx, ecc, [("out_file", "in_index")]),
-            (ecc, denoise_eddy, [("out_corrected", "in_file")]),
-            (ecc, fslroi, [("out_corrected", "in_file")]),
-            (fslroi, b0mask_node, [("roi_file", "b0_file")]),
+            #(ecc, denoise_eddy, [("out_corrected", "in_file")]),
+            #(ecc, fslroi, [("out_corrected", "in_file")]),
+            #(fslroi, b0mask_node, [("roi_file", "b0_file")]),
             (
                 ecc,
                 eddy_quad,
@@ -379,28 +471,57 @@ def init_dwi_preproc_wf(subject_id, dwi_file, metadata, parameters):
                     (("out_corrected", get_qc_path), "output_dir"),
                 ],
             ),
+            # Outputting things from eddy
+            (ecc, outputnode, [("out_corrected", "out_corrected")]),
+            (eddy_b0_mask, outputnode, [("out_file", "out_mask")]),
+            (ecc, outputnode, [("out_rotated_bvecs", "out_bvec")]),
+            # Feed in b0 to the fieldmap workflow
+            #(bet_dwi_pre, sdc_wf, [("out_file", "inputnode.b0_stripped")]),
+            (dwi_extract_b0, sdc_wf, [("out_file", "inputnode.b0_stripped")]),
+
+            # New avg b0 for eddy
+            #(ecc, eddy_avg_b0, [("out_corrected", "in_dwi")]),
+            #(eddy_avg_b0, eddy_b0mask_node, [("out_file", "b0_file")]),
+            #(denoise_eddy, denoise_eddy_mask, [("noise", "in_file")]),
+            #(eddy_b0mask_node, denoise_eddy_mask, [("mask_file", "mask_file")]),
+            #(inputnode, eddy_avg_b0, [("bval_file", "in_bval")]),
+
+            # Combining the bval and bvec from eddy
+            (ecc, eddy_grad_merge, [("out_rotated_bvecs", "in1")]),
+            (inputnode, eddy_grad_merge, [("bval_file", "in2")]),
+            # Extracting b0 from eddy
+            (ecc, eddy_extract_b0, [("out_corrected", "in_file")]),
+            (eddy_grad_merge, eddy_extract_b0, [("out", "grad_fsl")]),
+            # Averaging out b0 from mrmath
+            (eddy_extract_b0, eddy_mean_b0, [("out_file", "in_file")]),
+            (eddy_mean_b0, outputnode, [("out_file", "out_avg_b0")]),
+            # Skulstrip b0 using BET
+            (eddy_mean_b0, eddy_b0_mask, [("out_file", "in_file")]),
+
+            # Running eddy quad
+            (sdc_wf, eddy_quad, [("outputnode.out_fmap", "field")]),
             (inputnode, eddy_quad, [("bval_file", "bval_file")]),
             (ecc, eddy_quad, [("out_rotated_bvecs", "bvec_file")]),
-            (b0mask_node, eddy_quad, [("mask_file", "mask_file")]),
+            (eddy_b0_mask, eddy_quad, [("out_file", "mask_file")]),
             (gen_idx, eddy_quad, [("out_file", "idx_file")]),
-            (ecc, outputnode, [("out_corrected", "out_file")]),
-            (b0mask_node, outputnode, [("mask_file", "out_mask")]),
-            (ecc, outputnode, [("out_rotated_bvecs", "out_bvec")]),
-            (bet_dwi0, sdc_wf, [("out_file", "inputnode.b0_stripped")]),
-            (sdc_wf, eddy_quad, [("outputnode.out_fmap", "field")]),
+
+            # Running dtifit with eddy outputs
             (
                 ecc,
                 dtifit,
                 [("out_corrected", "dwi"), ("out_rotated_bvecs", "bvecs")],
             ),
-            (b0mask_node, dtifit, [("mask_file", "mask")]),
+            (eddy_b0_mask, dtifit, [("out_file", "mask")]),
             (inputnode, dtifit, [("bval_file", "bvals")]),
-            # New avg b0 for eddy
-            (ecc, eddy_avg_b0, [("out_corrected", "in_dwi")]),
-            (eddy_avg_b0, eddy_b0mask_node, [("out_file", "b0_file")]),
-            (denoise_eddy, denoise_eddy_mask, [("noise", "in_file")]),
-            (eddy_b0mask_node, denoise_eddy_mask, [("mask_file", "mask_file")]),
-            (inputnode, eddy_avg_b0, [("bval_file", "in_bval")]),
+            # Calculate dtifit RD
+            (dtifit, dtifit_RD, [("L2", "in_file")]),
+            (dtifit, dtifit_RD, [(("L3", to_list), "operand_files")]),
+            # dtifit output
+            (dtifit, outputnode, [("FA", "out_FA")]),
+            (dtifit, outputnode, [("V1", "out_V1")]),
+            (dtifit, outputnode, [("MD", "out_MD")]),
+            (dtifit, outputnode, [("L1", "out_L1")]),
+            (dtifit_RD, outputnode, [("out_file", "out_RD")]),
         ]
     )
 
